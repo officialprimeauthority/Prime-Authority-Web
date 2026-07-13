@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prime Authority Admin Panel</title>
+
+<link rel="stylesheet" href="style.css">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<header>
+
+<nav class="navbar">
+
+<div class="logo">PRIME AUTHORITY ADMIN</div>
+
+</nav>
+
+</header>
+
+<section class="about">
+
+<h1>ADMIN DASHBOARD</h1>
+
+<p>
+Manage join organization requests, tournament registrations and scrims from one place.
+</p>
+
+</section>
+
+<section class="stats">
+
+<div class="card">
+<h2 id="joinCount">0</h2>
+<p>Join Organization</p>
+</div>
+
+<div class="card">
+<h2 id="tourCount">0</h2>
+<p>Tournament Teams</p>
+</div>
+
+<div class="card">
+<h2 id="scrimCount">0</h2>
+<p>Scrims Teams</p>
+</div>
+
+<div class="card">
+<h2 id="scrimCount">0</h2>
+<p>Scrims Teams</p>
+</div>
+
+<div class="card">
+<h2>LIVE</h2>
+<p>Realtime Database</p>
+</div>
+
+</section>
+
+<section class="about">
+
+<h1>JOIN ORGANIZATION</h1>
+
+<h2 style="color:#ff2b2b;margin-bottom:20px;">Join Organization</h2>
+
+<div id="joinList"></div>
+
+<hr style="margin:50px 0;border:1px solid #333;">
+
+
+</section>
+
+<section class="about">
+
+<h1>TOURNAMENT REGISTRATIONS</h1>
+
+<h2 style="color:#ff2b2b;margin-bottom:20px;">Tournament Registrations</h2>
+
+<div id="tournamentList"></div>
+
+</section>
+
+<section class="about">
+
+<h1>SCRIMS REGISTRATIONS</h1>
+
+<div id="scrimsList"></div>
+
+</section>
+
+<script type="module" src="admin.js"></script>
+
+</body>
+</html>
