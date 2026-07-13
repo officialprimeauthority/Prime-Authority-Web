@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prime Authority Modal Demo</title>
+  <link rel="stylesheet" href="modal.css">
+</head>
+<body style="background:#07070f; color:#fff; font-family:Inter, system-ui, sans-serif; display:flex; min-height:100vh; align-items:center; justify-content:center; padding:24px;">
+  <div style="max-width:720px; width:100%; text-align:center;">
+    <h1 style="margin-bottom:12px; font-size:2rem;">Prime Authority Modal Demo</h1>
+    <p style="color:#aaa; margin-bottom:24px;">Custom success, error, and confirmation modals with theme matching your website.</p>
+    <button class="pa-modal-button primary" style="margin:6px;" onclick="showSuccessModal('Success', 'The operation completed successfully.')">Success</button>
+    <button class="pa-modal-button danger" style="margin:6px;" onclick="showErrorModal('Error', 'Something went wrong. Please try again.')">Error</button>
+    <button class="pa-modal-button secondary" style="margin:6px;" onclick="showConfirmModal({ title:'Delete User', message:'Are you sure you want to delete this user from Firebase? This action cannot be undone.', confirmText:'Delete User', cancelText:'Cancel' }).then((confirmed) => console.log('confirmed', confirmed))">Confirm</button>
+  </div>
+  <script src="modal.js"></script>
+</body>
+</html>
