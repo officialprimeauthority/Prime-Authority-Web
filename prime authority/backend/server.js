@@ -72,10 +72,10 @@ function getSmtpCandidates() {
     host,
     auth: { user, pass },
     family: 4,
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000,
-    requireTLS: true,
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout:20000,
+    //requireTLS: true,
     lookup: (hostname, options, callback) => {
       dns.lookup(hostname, { family: 4, all: false }, (error, address) => {
         callback(error, address, 4);
