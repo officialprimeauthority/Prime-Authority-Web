@@ -15,9 +15,9 @@ const port = Number(process.env.PORT || 5001);
 const env = process.env.NODE_ENV || 'development';
 const forgotPasswordCooldowns = new Map();
 const FORGOT_PASSWORD_COOLDOWN_MS = 5 * 60 * 1000;
-const FRONTEND_BASE_URL = process.env.FRONTEND_RESET_URL || 'https://prime-authority.netlify.app';
+const FRONTEND_BASE_URL = process.env.FRONTEND_RESET_URL || 'https://primeauthority.netlify.app';
 
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,https://prime-authority.netlify.app,https://prime-authority-backend.onrender.com')
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,https://primeauthority.netlify.app,https://prime-authority-backend.onrender.com')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
