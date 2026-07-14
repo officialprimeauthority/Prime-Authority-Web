@@ -115,6 +115,7 @@ async function sendMailWithBrevo(message) {
     return { sent: false, reason: error.message };
   }
 }
+
 function buildCustomResetLink(firebaseLink) {
   try {
     const url = new URL(firebaseLink);
