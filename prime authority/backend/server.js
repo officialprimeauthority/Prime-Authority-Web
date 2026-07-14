@@ -15,16 +15,17 @@ const port = Number(process.env.PORT || 5001);
 const env = process.env.NODE_ENV || 'development';
 const forgotPasswordCooldowns = new Map();
 const FORGOT_PASSWORD_COOLDOWN_MS = 5 * 60 * 1000;
-const FRONTEND_BASE_URL = process.env.FRONTEND_RESET_URL || 'https://primeauthority.netlify.app';
+const FRONTEND_BASE_URL = process.env.FRONTEND_RESET_URL || 'https://primeauthority.website';
 
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,https://primeauthority.netlify.app,https://prime-authority-backend.onrender.com')
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,https://primeauthority.website,https://primeauthority.netlify.app,https://prime-authority-backend.onrender.com')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const isAllowedOrigin = !origin || allowedOrigins.includes(origin.replace(/\/$/, '')) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:') || /\.netlify\.app$/i.test(origin);
+  const normalizedOrigin = origin?.replace(/\/$/, '');
+  const isAllowedOrigin = !origin || allowedOrigins.includes(normalizedOrigin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:') || /\.netlify\.app$/i.test(origin) || normalizedOrigin === 'https://primeauthority.website';
 
   if (isAllowedOrigin) {
     res.header('Access-Control-Allow-Origin', origin || '*');
