@@ -12,6 +12,7 @@
     "cors": "^2.8.6",
     "dotenv": "^16.4.1",
     "express": "^4.19.2",
-    "firebase-admin": "^12.1.0"
+    "firebase-admin": "^12.1.0",
+    "nodemailer": "^7.0.1"
   }
 }
