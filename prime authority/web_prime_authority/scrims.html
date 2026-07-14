@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrims Registration | Prime Authority</title>
+
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="modal.css">
+
+</head>
+
+<body>
+
+<header>
+
+<nav class="navbar">
+
+<h1 class="logo">PRIME AUTHORITY</h1>
+
+<ul class="menu">
+<li><a href="notifications.html" class="notification-link">🔔<span class="badge">0</span></a></li>
+</ul>
+
+</nav>
+
+</header>
+
+<section class="recruitment">
+
+<h1>SCRIMS REGISTRATION</h1>
+
+<p class="join-text">Book your scrims slot with Prime Authority.</p>
+<p id="scrimsStatusText" class="join-text" style="margin-top:-12px; margin-bottom:20px;"></p>
+
+<div id="scrimsBanner" style="display:none; max-width:860px; margin:0 auto 20px auto; padding:16px 20px; border:1px solid #ff2b2b; border-radius:14px; background:rgba(255,43,43,0.12); color:#fff; text-align:center; font-weight:700;">
+  Scrims slots are open now. Book early to secure your match.
+</div>
+
+<div id="scrimsFormContainer">
+  <form id="scrimsForm" class="join-form">
+    <input type="text" id="teamName" placeholder="TEAM NAME (REQUIRED)" required>
+    <label style="color:#fff; font-size:14px; margin:0 0 6px 0;">TEAM LOGO (OPTIONAL)</label>
+    <input type="file" id="teamLogo" accept="image/*">
+    <input type="text" id="captainUID" placeholder="TEAM IGL UID (REQUIRED)" required>
+    <input type="text" id="captainIGN" placeholder="TEAM IGL IN-GAME NAME (IGN) (REQUIRED)" required>
+    <input type="tel" id="whatsapp" placeholder="TEAM IGL / MANAGER CONTACT NO. (WHATSAPP NO.) (REQUIRED)" required>
+    <p style="color:#fff; font-size:14px; margin:0 0 10px 0;">Note: Sabse niche form ke checkbox zaroor check karein.</p>
+    <p style="color:#fff; font-size:14px; font-weight:600; margin:0 0 8px 0;">AGREEMENT</p>
+    <label style="color:#fff; font-size:14px; display:flex; align-items:center; gap:10px;"><input type="checkbox" id="scrimsAgreement" required> I confirm all details are correct.</label>
+    <label style="color:#fff; font-size:14px; display:flex; align-items:center; gap:10px;"><input type="checkbox" id="scrimsTerms" required> I agree to PRIME AUTHORITY Tournament Rules & Regulations.</label>
+    <button type="submit">BOOK SCRIMS</button>
+  </form>
+</div>
+
+<div id="scrimsComingSoon" style="display:none; max-width:560px; margin:0 auto; padding:30px; border:2px solid #ff2b2b; border-radius:20px; background:#181818;">
+  <h2 style="color:#ff2b2b; margin-bottom:12px;">Registration Opening Soon</h2>
+  <p style="color:#ddd; line-height:1.8;">Scrims registration will be available once the admin turns this form on from the admin panel.</p>
+</div>
+
+</section>
+
+<script src="loading.js"></script>
+<script src="modal.js"></script>
+<script type="module" src="script.js"></script>
+
+</body>
+</html>
