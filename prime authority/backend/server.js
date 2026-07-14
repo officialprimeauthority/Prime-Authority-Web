@@ -115,6 +115,22 @@ async function sendMailWithBrevo(message) {
     return { sent: false, reason: error.message };
   }
 }
+function buildCustomResetLink(firebaseLink) {
+  try {
+    const url = new URL(firebaseLink);
+    const oobCode = url.searchParams.get('oobCode');
+
+    if (!oobCode) {
+      console.error('No oobCode found in Firebase reset link');
+      return null;
+    }
+
+    return `https://primeauthority.netlify.app/reset-password.html?oobCode=${encodeURIComponent(oobCode)}`;
+  } catch (error) {
+    console.error('Failed to build custom reset link:', error);
+    return null;
+  }
+}
 
 async function sendResetLinkEmail(email, resetLink) {
   const message = {
