@@ -60,9 +60,10 @@ function isValidEmail(email) {
 
 async function sendMailWithBrevo(message) {
   const brevoApiKey = process.env.BREVO_API_KEY;
+  const brevoFromEmail = process.env.BREVO_FROM_EMAIL || 'officialprimeauthority@gmail.com';
   
   if (!brevoApiKey) {
-    console.error('Brevo API key not configured. Set BREVO_API_KEY in environment.');
+    console.error('[Brevo] ERROR: BREVO_API_KEY environment variable is not set!');
     return { sent: false, reason: 'Brevo API key not configured' };
   }
 
@@ -70,18 +71,19 @@ async function sendMailWithBrevo(message) {
     const payload = {
       sender: {
         name: 'Prime Authority',
-        email: message.from
+        email: brevoFromEmail
       },
       to: [{ email: message.to }],
       subject: message.subject,
-      htmlContent: message.html,
-      replyTo: message.replyTo ? { email: message.replyTo } : undefined,
+      htmlContent: message.html
     };
 
-    // Remove undefined fields
-    if (!payload.replyTo) delete payload.replyTo;
+    if (message.replyTo) {
+      payload.replyTo = { email: message.replyTo };
+    }
 
-    console.log('[Brevo] Sending email to:', message.to);
+    console.log(`[Brevo] Attempting to send email to: ${message.to}`);
+    console.log(`[Brevo] API Key present: ${brevoApiKey ? 'YES' : 'NO'}`);
 
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -92,59 +94,81 @@ async function sendMailWithBrevo(message) {
       body: JSON.stringify(payload),
     });
 
+    const responseText = await response.text();
+    
     if (!response.ok) {
-      const error = await response.json();
-      console.error('[Brevo] Email send failed:', {
-        status: response.status,
-        error: error,
-      });
-      return { sent: false, reason: error.message || `HTTP ${response.status}` };
+      console.error(`[Brevo] HTTP ${response.status} - Response:`, responseText);
+      return { sent: false, reason: `HTTP ${response.status}: ${responseText}` };
     }
 
-    const result = await response.json();
-    console.log('[Brevo] Email sent successfully. Message ID:', result.messageId);
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      result = { messageId: 'unknown' };
+    }
+
+    console.log(`[Brevo] ✅ Email sent successfully to ${message.to}. Message ID:`, result.messageId);
     return { sent: true, messageId: result.messageId };
   } catch (error) {
-    console.error('[Brevo] Failed to send email:', error.message);
+    console.error('[Brevo] Exception while sending email:', error.message, error.stack);
     return { sent: false, reason: error.message };
   }
 }
 
 async function sendResetLinkEmail(email, resetLink) {
   const message = {
-    from: process.env.SMTP_FROM || process.env.BREVO_FROM_EMAIL || 'noreply@prime-authority.com',
+    from: process.env.BREVO_FROM_EMAIL || 'officialprimeauthority@gmail.com',
     to: email,
     subject: 'Reset your Prime Authority password',
-    html: `<p>Hello,</p><p>Use the link below to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`,
+    html: `
+      <html>
+        <body style="font-family: Arial, sans-serif;">
+          <h2>Password Reset</h2>
+          <p>Hello,</p>
+          <p>Click the link below to reset your password:</p>
+          <p><a href="${resetLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a></p>
+          <p>Or copy this link: ${resetLink}</p>
+        </body>
+      </html>
+    `,
   };
 
+  console.log(`[sendResetLinkEmail] Preparing to send password reset email to: ${email}`);
   return sendMailWithBrevo(message);
 }
 
 async function sendContactFormEmail(payload) {
-  const recipient = process.env.CONTACT_TO || process.env.BREVO_FROM_EMAIL || 'noreply@prime-authority.com';
+  const recipient = process.env.CONTACT_TO || process.env.BREVO_FROM_EMAIL || 'officialprimeauthority@gmail.com';
   const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-      <h2 style="margin-bottom: 8px;">New Contact Form Submission</h2>
-      <p><strong>Full Name:</strong> ${payload.fullName || '-'}</p>
-      <p><strong>Email:</strong> ${payload.emailAddress || '-'}</p>
-      <p><strong>Mobile:</strong> ${payload.mobileNumber || '-'}</p>
-      <p><strong>Subject:</strong> ${payload.subject || '-'}</p>
-      <p><strong>Organization / Team:</strong> ${payload.organization || '-'}</p>
-      <p><strong>Category:</strong> ${payload.category || '-'}</p>
-      <p><strong>Message:</strong></p>
-      <p>${(payload.message || '').replace(/\n/g, '<br>')}</p>
-    </div>
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="margin-bottom: 8px; color: #007bff;">New Contact Form Submission</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Full Name:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${payload.fullName || '-'}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Email:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${payload.emailAddress || '-'}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Mobile:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${payload.mobileNumber || '-'}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Subject:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${payload.subject || '-'}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Organization / Team:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${payload.organization || '-'}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Category:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${payload.category || '-'}</td></tr>
+        </table>
+        <h3 style="margin-top: 20px; color: #007bff;">Message:</h3>
+        <p style="background-color: #f5f5f5; padding: 10px; border-left: 4px solid #007bff;">
+          ${(payload.message || '-').replace(/\n/g, '<br>')}
+        </p>
+      </body>
+    </html>
   `;
 
   const message = {
-    from: process.env.BREVO_FROM_EMAIL || 'noreply@prime-authority.com',
+    from: process.env.BREVO_FROM_EMAIL || 'officialprimeauthority@gmail.com',
     to: recipient,
-    replyTo: payload.emailAddress || payload.userEmail,
-    subject: `New Contact Form: ${payload.subject || 'Contact Request'}`,
+    replyTo: payload.emailAddress,
+    subject: `[Contact Form] ${payload.subject || 'Contact Request'}`,
     html,
   };
 
+  console.log(`[sendContactFormEmail] Preparing to send contact form email to: ${recipient}, reply-to: ${payload.emailAddress}`);
   return sendMailWithBrevo(message);
 }
 
