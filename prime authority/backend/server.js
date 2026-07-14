@@ -71,16 +71,16 @@ function getSmtpCandidates() {
   const baseConfig = {
     host,
     auth: { user, pass },
-    // family: 4,
-    connectionTimeout: 20000,
-    greetingTimeout: 20000,
-    socketTimeout:20000,
-    //requireTLS: true,
-    /*lookup: (hostname, options, callback) => {
+    family: 4,
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
+    requireTLS: true,
+    lookup: (hostname, options, callback) => {
       dns.lookup(hostname, { family: 4, all: false }, (error, address) => {
         callback(error, address, 4);
       });
-    },*/
+    },
   };
 
   const candidates = [
@@ -112,13 +112,17 @@ async function sendMailWithFallback(message) {
     const candidates = getSmtpCandidates();
     let lastError = null;
 
-   console.log('[SMTP] Configured transport:', {
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT || 465) === 465,
-  user: configuredUser,
-  from: process.env.SMTP_FROM || configuredUser
-});
+    console.log('[SMTP] Configured transport:', {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT || 465) === 465,
+      user: configuredUser,
+      from: process.env.SMTP_FROM || configuredUser,
+      requireTLS: true,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+    });
 
     for (const config of candidates) {
       const transporter = nodemailer.createTransport(config);
@@ -134,8 +138,7 @@ async function sendMailWithFallback(message) {
         });
 
         console.log(`[SMTP] Verifying connection to ${config.host}:${config.port} using IPv4 ${resolvedAddress}...`);
-        //await transporter.verify();
-        await transporter.sendMail(message);
+        await transporter.verify();
         console.log(`[SMTP] Connection verified for ${config.host}:${config.port} using IPv4 ${resolvedAddress}`);
         await transporter.sendMail(message);
         return { sent: true, usedAddress: resolvedAddress };
