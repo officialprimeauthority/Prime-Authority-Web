@@ -125,7 +125,7 @@ function buildCustomResetLink(firebaseLink) {
       return null;
     }
 
-    return `https://primeauthority.netlify.app/reset-password.html?oobCode=${encodeURIComponent(oobCode)}`;
+   return `https://primeauthority.website/reset-password.html?oobCode=${encodeURIComponent(oobCode)}`;
   } catch (error) {
     console.error('Failed to build custom reset link:', error);
     return null;
