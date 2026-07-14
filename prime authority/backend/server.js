@@ -71,16 +71,16 @@ function getSmtpCandidates() {
   const baseConfig = {
     host,
     auth: { user, pass },
-    family: 4,
+    // family: 4,
     connectionTimeout: 20000,
     greetingTimeout: 20000,
     socketTimeout:20000,
     //requireTLS: true,
-    lookup: (hostname, options, callback) => {
+    /*lookup: (hostname, options, callback) => {
       dns.lookup(hostname, { family: 4, all: false }, (error, address) => {
         callback(error, address, 4);
       });
-    },
+    },*/
   };
 
   const candidates = [
