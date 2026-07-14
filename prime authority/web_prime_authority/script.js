@@ -71,6 +71,11 @@ function init() {
   listenToHeroContent();
   listenToLineup();
   renderNotificationsPage();
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('auth') === 'login') {
+    openAuthModal('login');
+  }
 }
 
 function initLoader() {
