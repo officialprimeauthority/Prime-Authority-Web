@@ -1,4 +1,3 @@
-import dns from 'dns';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -6,9 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeFirebaseAdmin, getFirebaseAuth } from './firebaseAdmin.js';
 import { getDatabase } from 'firebase-admin/database';
-
-// Prefer IPv4 for outbound SMTP to avoid Gmail IPv6 timeouts from this environment.
-dns.setDefaultResultOrder('ipv4first');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,118 +58,71 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
 }
 
-function getSmtpCandidates() {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-  const requestedPort = Number(process.env.SMTP_PORT || 465);
-  const requestedSecure = process.env.SMTP_SECURE === 'true' || requestedPort === 465;
-  const baseConfig = {
-    host,
-    auth: { user, pass },
-    family: 4,
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000,
-    requireTLS: true,
-    lookup: (hostname, options, callback) => {
-      dns.lookup(hostname, { family: 4, all: false }, (error, address) => {
-        callback(error, address, 4);
-      });
-    },
-  };
-
-  const candidates = [
-    { ...baseConfig, port: requestedPort, secure: requestedSecure },
-  ];
-
-  if (requestedPort !== 465) {
-    candidates.push({ ...baseConfig, port: 465, secure: true });
-  }
-
-  if (requestedPort !== 587) {
-    candidates.push({ ...baseConfig, port: 587, secure: false });
-  }
-
-  return candidates;
-}
-
-async function sendMailWithFallback(message) {
-  const configuredUser = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const configuredPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-
-  if (!process.env.SMTP_HOST || !configuredUser || !configuredPass) {
-    console.error('SMTP not configured. Missing SMTP_HOST/SMTP_USER/SMTP_PASS or EMAIL_USER/EMAIL_PASS in environment.');
-    return { sent: false, reason: 'SMTP not configured' };
+async function sendMailWithBrevo(message) {
+  const brevoApiKey = process.env.BREVO_API_KEY;
+  
+  if (!brevoApiKey) {
+    console.error('Brevo API key not configured. Set BREVO_API_KEY in environment.');
+    return { sent: false, reason: 'Brevo API key not configured' };
   }
 
   try {
-    const nodemailer = await import('nodemailer');
-    const candidates = getSmtpCandidates();
-    let lastError = null;
+    const payload = {
+      sender: {
+        name: 'Prime Authority',
+        email: message.from
+      },
+      to: [{ email: message.to }],
+      subject: message.subject,
+      htmlContent: message.html,
+      replyTo: message.replyTo ? { email: message.replyTo } : undefined,
+    };
 
-    console.log('[SMTP] Configured transport:', {
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT || 465),
-      secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT || 465) === 465,
-      user: configuredUser,
-      from: process.env.SMTP_FROM || configuredUser,
-      requireTLS: true,
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
+    // Remove undefined fields
+    if (!payload.replyTo) delete payload.replyTo;
+
+    console.log('[Brevo] Sending email to:', message.to);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': brevoApiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     });
 
-    for (const config of candidates) {
-      const transporter = nodemailer.createTransport(config);
-      try {
-        const resolvedAddress = await new Promise((resolve, reject) => {
-          dns.lookup(config.host, { family: 4, all: false }, (error, address) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(address);
-            }
-          });
-        });
-
-        console.log(`[SMTP] Verifying connection to ${config.host}:${config.port} using IPv4 ${resolvedAddress}...`);
-        await transporter.verify();
-        console.log(`[SMTP] Connection verified for ${config.host}:${config.port} using IPv4 ${resolvedAddress}`);
-        await transporter.sendMail(message);
-        return { sent: true, usedAddress: resolvedAddress };
-      } catch (error) {
-        lastError = error;
-        console.error(`[SMTP] Attempt failed for ${config.host}:${config.port}`, {
-          message: error.message,
-          code: error.code,
-          response: error.response,
-          responseCode: error.responseCode,
-          stack: error.stack,
-        });
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[Brevo] Email send failed:', {
+        status: response.status,
+        error: error,
+      });
+      return { sent: false, reason: error.message || `HTTP ${response.status}` };
     }
 
-    return { sent: false, reason: lastError?.message || 'SMTP send failed' };
+    const result = await response.json();
+    console.log('[Brevo] Email sent successfully. Message ID:', result.messageId);
+    return { sent: true, messageId: result.messageId };
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error('[Brevo] Failed to send email:', error.message);
     return { sent: false, reason: error.message };
   }
 }
 
 async function sendResetLinkEmail(email, resetLink) {
   const message = {
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: process.env.SMTP_FROM || process.env.BREVO_FROM_EMAIL || 'noreply@prime-authority.com',
     to: email,
     subject: 'Reset your Prime Authority password',
     html: `<p>Hello,</p><p>Use the link below to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`,
   };
 
-  return sendMailWithFallback(message);
+  return sendMailWithBrevo(message);
 }
 
 async function sendContactFormEmail(payload) {
-  const recipient = process.env.CONTACT_TO || process.env.SMTP_FROM || process.env.SMTP_USER;
+  const recipient = process.env.CONTACT_TO || process.env.BREVO_FROM_EMAIL || 'noreply@prime-authority.com';
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
       <h2 style="margin-bottom: 8px;">New Contact Form Submission</h2>
@@ -189,14 +138,14 @@ async function sendContactFormEmail(payload) {
   `;
 
   const message = {
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: process.env.BREVO_FROM_EMAIL || 'noreply@prime-authority.com',
     to: recipient,
-    replyTo: payload.emailAddress || payload.userEmail || process.env.SMTP_USER,
+    replyTo: payload.emailAddress || payload.userEmail,
     subject: `New Contact Form: ${payload.subject || 'Contact Request'}`,
     html,
   };
 
-  return sendMailWithFallback(message);
+  return sendMailWithBrevo(message);
 }
 
 app.get('/health', (_req, res) => {
