@@ -291,9 +291,11 @@ app.post('/forgot-password', async (req, res) => {
     };
 
     const resetLink = await auth.generatePasswordResetLink(normalizedEmail, actionCodeSettings);
-    console.log("Reset Link Generated:", resetLink);
-    
-    const mailResult = await sendResetLinkEmail(normalizedEmail, resetLink);
+    const customResetLink = buildCustomResetLink(resetLink);
+    console.log('Reset Link Generated:', resetLink);
+    console.log('Custom Reset Link:', customResetLink || 'Unable to build custom link');
+
+    const mailResult = await sendResetLinkEmail(normalizedEmail, customResetLink || resetLink);
 
     if (process.env.NODE_ENV !== 'production' && process.env.DEBUG_RESET_LINK === 'true') {
       console.log('Password reset link:', resetLink);
