@@ -3,6 +3,7 @@
 // ═════════════════════════════════════════════════════════════════════════
 
 const ADMIN_EMAIL = "admin@primeauthority.com";
+const IMGBB_API_KEY = "cce75417ebaca6654e3b46911c9e512d";
 
 let currentTab = "dashboard";
 let currentUser = null;
@@ -20,9 +21,13 @@ let allData = {
     scrimBannerEnabled: false,
     joinBannerEnabled: false,
     tournamentBannerImage: '',
+    tournamentBannerImageDeleteHash: '',
     scrimBannerImage: '',
+    scrimBannerImageDeleteHash: '',
     joinBannerImage: '',
+    joinBannerImageDeleteHash: '',
     upcomingTournamentBannerImage: '',
+    upcomingTournamentBannerImageDeleteHash: '',
     hero: {
         title: "PRIME AUTHORITY",
         subtitle: "Where Champions Are Made.",
@@ -32,6 +37,47 @@ let allData = {
     }
 };
 
+async function uploadFileToImgbb(file) {
+    if (!file) return null;
+    const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result?.toString() || '';
+            const payload = result.includes(',') ? result.split(',')[1] : result;
+            resolve(payload);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+
+    const formData = new FormData();
+    formData.append('image', base64);
+
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData
+    });
+    const data = await response.json();
+    if (!data.success) {
+        throw new Error(data.error?.message || 'imgbb upload failed');
+    }
+    return {
+        url: data.data.url,
+        deleteHash: data.data.delete_hash
+    };
+}
+
+async function deleteImgbbImage(deleteHash) {
+    if (!deleteHash) return;
+    try {
+        await fetch(`https://api.imgbb.com/1/delete/${encodeURIComponent(deleteHash)}?key=${IMGBB_API_KEY}`, {
+            method: 'POST'
+        });
+    } catch (err) {
+        console.warn('imgbb delete failed', err);
+    }
+}
+
 let heroDraft = { ...allData.hero };
 let lineupDraft = {
     teamName: "",
@@ -40,11 +86,14 @@ let lineupDraft = {
     playerUid: "",
     role: "",
     joiningDate: "",
-    logo: ""
+    logo: "",
+    logoFile: null,
+    logoDeleteHash: ''
 };
 let rosterDraft = {
     teamName: "",
     logo: "",
+    logoFile: null,
     players: [] // { id?, serialNumber, playerIgn, playerUid, role, joiningDate, status, profile }
 };
 let teamFormVisible = false;
@@ -205,6 +254,7 @@ function setupNavigation() {
         { key: "tournament", label: "Tournament Registration", icon: "🏆" },
         { key: "scrims", label: "Scrims Registration", icon: "⚔️" },
         { key: "benefits", label: "Join Applications", icon: "📋" },
+        { key: "logos", label: "Logos", icon: "📁" },
         { key: "team", label: "Our Lineup", icon: "👥" },
         { key: "contact", label: "Contact Requests", icon: "📧" },
         { key: "journey", label: "Journey", icon: "🚩" },
@@ -252,8 +302,13 @@ async function loadFirebaseData() {
         const scrimBannerEnabledRef = ref(database, 'settings/scrimBannerEnabled');
         const joinBannerEnabledRef = ref(database, 'settings/joinBannerEnabled');
         const tournamentBannerImageRef = ref(database, 'settings/tournamentBannerImage');
+        const tournamentBannerImageDeleteHashRef = ref(database, 'settings/tournamentBannerImageDeleteHash');
         const scrimBannerImageRef = ref(database, 'settings/scrimBannerImage');
+        const scrimBannerImageDeleteHashRef = ref(database, 'settings/scrimBannerImageDeleteHash');
         const joinBannerImageRef = ref(database, 'settings/joinBannerImage');
+        const joinBannerImageDeleteHashRef = ref(database, 'settings/joinBannerImageDeleteHash');
+        const upcomingBannerImageRef = ref(database, 'settings/upcomingTournamentBannerImage');
+        const upcomingBannerImageDeleteHashRef = ref(database, 'settings/upcomingTournamentBannerImageDeleteHash');
         const rosterSizeRef = ref(database, 'settings/rosterSize');
         
         // Setup listeners
@@ -334,13 +389,38 @@ async function loadFirebaseData() {
             renderCurrentTab();
         });
 
+        onValue(tournamentBannerImageDeleteHashRef, (snapshot) => {
+            allData.tournamentBannerImageDeleteHash = snapshot.val() || '';
+            renderCurrentTab();
+        });
+
         onValue(scrimBannerImageRef, (snapshot) => {
             allData.scrimBannerImage = snapshot.val() || '';
             renderCurrentTab();
         });
 
+        onValue(scrimBannerImageDeleteHashRef, (snapshot) => {
+            allData.scrimBannerImageDeleteHash = snapshot.val() || '';
+            renderCurrentTab();
+        });
+
         onValue(joinBannerImageRef, (snapshot) => {
             allData.joinBannerImage = snapshot.val() || '';
+            renderCurrentTab();
+        });
+
+        onValue(joinBannerImageDeleteHashRef, (snapshot) => {
+            allData.joinBannerImageDeleteHash = snapshot.val() || '';
+            renderCurrentTab();
+        });
+
+        onValue(upcomingBannerImageRef, (snapshot) => {
+            allData.upcomingTournamentBannerImage = snapshot.val() || '';
+            renderCurrentTab();
+        });
+
+        onValue(upcomingBannerImageDeleteHashRef, (snapshot) => {
+            allData.upcomingTournamentBannerImageDeleteHash = snapshot.val() || '';
             renderCurrentTab();
         });
 
@@ -446,6 +526,9 @@ function renderCurrentTab() {
             break;
         case 'benefits':
             contentArea.innerHTML = renderJoinApplicationsTab();
+            break;
+        case 'logos':
+            contentArea.innerHTML = renderLogosTab();
             break;
         case 'team':
             contentArea.innerHTML = renderTeamTab();
@@ -573,6 +656,7 @@ function renderTable(entries) {
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>Logo</th>
                                 <th>Team Name</th>
                         <th>Captain / IGL</th>
                         <th>Registered On</th>
@@ -584,6 +668,7 @@ function renderTable(entries) {
                     ${entries.map((e, i) => `
                         <tr>
                             <td>${String(i + 1).padStart(2, '0')}</td>
+                            <td>${e.teamLogo || e.logo ? `<img src="${escapeHTML(e.teamLogo || e.logo)}" alt="Logo" style="width:36px;height:36px;object-fit:cover;border-radius:10px;border:1px solid #1e1e2e;">` : '<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:#111;border:1px solid #1e1e2e;border-radius:10px;color:#666;">?</div>'}</td>
                             <td><strong>${e.teamName || e.managerIgn || e.ign || '—'}</strong></td>
                             <td>${e.captainName || e.managerIgn || e.captainIGN || e.ign || '—'}</td>
                             <td>${e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
@@ -648,9 +733,12 @@ function renderJoinApplicationsTab() {
             return `
                 <div style="padding: 16px; border: 1px solid #1e1e2e; border-radius: 12px; background: #0a0a14; display: grid; gap: 12px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <div>
-                            <p style="margin: 0; color: #fff; font-weight: 800;">${escapeHTML(join.teamName || join.managerIgn || '—')}</p>
-                            <p style="margin: 4px 0 0; color: #666; font-size: 12px;">${escapeHTML(join.managerIgn || '—')} • ${escapeHTML(join.teamRegion || '—')}</p>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            ${join.teamLogo || join.logo ? `<img src="${escapeHTML(join.teamLogo || join.logo)}" alt="Logo" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #1e1e2e;">` : `<div style="width:48px;height:48px;border-radius:8px;background:#071018;display:flex;align-items:center;justify-content:center;color:#666;border:1px solid #1e1e2e;">?</div>`}
+                            <div>
+                                <p style="margin: 0; color: #fff; font-weight: 800;">${escapeHTML(join.teamName || join.managerIgn || '—')}</p>
+                                <p style="margin: 4px 0 0; color: #666; font-size: 12px;">${escapeHTML(join.managerIgn || '—')} • ${escapeHTML(join.teamRegion || '—')}</p>
+                            </div>
                         </div>
                         <span style="padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: ${statusColor}; font-size: 11px; font-weight: 700;">${join.status || 'Pending'}</span>
                     </div>
@@ -692,6 +780,83 @@ function renderJoinApplicationsTab() {
 
 function renderBenefitsTab() {
     return renderJoinApplicationsTab();
+}
+
+function renderLogosTab() {
+    const logoEntries = [
+        ...allData.joins.map(entry => ({
+            id: entry.id,
+            type: 'Join Application',
+            teamName: entry.teamName || entry.managerIgn || 'Join Application',
+            logoUrl: entry.teamLogo || ''
+        })),
+        ...allData.tournaments.map(entry => ({
+            id: entry.id,
+            type: 'Tournament',
+            teamName: entry.teamName || 'Tournament Team',
+            logoUrl: entry.teamLogo || ''
+        })),
+        ...allData.scrims.map(entry => ({
+            id: entry.id,
+            type: 'Scrims',
+            teamName: entry.teamName || 'Scrims Team',
+            logoUrl: entry.teamLogo || ''
+        })),
+        ...allData.lineup.map(entry => ({
+            id: entry.id,
+            type: 'Lineup',
+            teamName: entry.teamName || 'Lineup Entry',
+            logoUrl: entry.logo || ''
+        }))
+    ].filter(item => item.logoUrl);
+
+    return `
+        <div class="content-header">
+            <h1>Logo Library</h1>
+            <p>All uploaded logos and images from forms.</p>
+        </div>
+        <div class="card">
+            ${logoEntries.length === 0 ? '<p class="no-entries">No logos found.</p>' : `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Team / Section</th>
+                                <th>Logo</th>
+                                <th>Source</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logoEntries.map((entry, index) => `
+                                <tr>
+                                    <td>${String(index + 1).padStart(2, '0')}</td>
+                                    <td><strong>${escapeHTML(entry.teamName)}</strong></td>
+                                    <td><img src="${escapeHTML(entry.logoUrl)}" alt="Logo" style="width: 48px; height: 48px; object-fit: cover; border-radius: 10px; border: 1px solid #1e1e2e;"></td>
+                                    <td>${escapeHTML(entry.type)}</td>
+                                    <td>
+                                        <a class="btn btn-primary" href="${escapeHTML(entry.logoUrl)}" target="_blank" rel="noopener noreferrer">View</a>
+                                        <button class="btn btn-secondary" onclick="downloadImage('${encodeURIComponent(entry.logoUrl)}')">Download</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function downloadImage(encodedUrl) {
+    const url = decodeURIComponent(encodedUrl);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = url.split('/').pop().split('?')[0] || 'logo.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 async function updateJoinStatus(joinId, status) {
@@ -2285,16 +2450,23 @@ async function saveTournamentBanner() {
             await showErrorModal('No File Selected', 'Please choose an image from your device first.');
             return;
         }
-        const imageBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
+
+        const upload = await uploadFileToImgbb(file);
+        if (!upload || !upload.url) {
+            throw new Error('Upload failed');
+        }
+
+        const oldDeleteHash = allData.tournamentBannerImageDeleteHash;
         await set(ref(database, 'settings/tournamentBannerEnabled'), true);
-        await set(ref(database, 'settings/tournamentBannerImage'), imageBase64);
+        await set(ref(database, 'settings/tournamentBannerImage'), upload.url);
+        await set(ref(database, 'settings/tournamentBannerImageDeleteHash'), upload.deleteHash || '');
+
         allData.tournamentBannerEnabled = true;
-        allData.tournamentBannerImage = imageBase64;
+        allData.tournamentBannerImage = upload.url;
+        allData.tournamentBannerImageDeleteHash = upload.deleteHash || '';
+
+        if (oldDeleteHash) deleteImgbbImage(oldDeleteHash);
+
         await showSuccessModal('Banner Saved', 'The tournament banner has been added.');
         renderCurrentTab();
     } catch (err) {
@@ -2305,10 +2477,14 @@ async function saveTournamentBanner() {
 
 async function deleteTournamentBanner() {
     try {
+        const deleteHash = allData.tournamentBannerImageDeleteHash;
         await set(ref(database, 'settings/tournamentBannerEnabled'), false);
         await set(ref(database, 'settings/tournamentBannerImage'), '');
+        await set(ref(database, 'settings/tournamentBannerImageDeleteHash'), '');
         allData.tournamentBannerEnabled = false;
         allData.tournamentBannerImage = '';
+        allData.tournamentBannerImageDeleteHash = '';
+        if (deleteHash) await deleteImgbbImage(deleteHash);
         await showSuccessModal('Banner Removed', 'The tournament banner has been removed.');
         renderCurrentTab();
     } catch (err) {
@@ -2325,16 +2501,22 @@ async function saveScrimBanner() {
             await showErrorModal('No File Selected', 'Please choose an image from your device first.');
             return;
         }
-        const imageBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
+        const upload = await uploadFileToImgbb(file);
+        if (!upload || !upload.url) {
+            throw new Error('Upload failed');
+        }
+
+        const oldDeleteHash = allData.scrimBannerImageDeleteHash;
         await set(ref(database, 'settings/scrimBannerEnabled'), true);
-        await set(ref(database, 'settings/scrimBannerImage'), imageBase64);
+        await set(ref(database, 'settings/scrimBannerImage'), upload.url);
+        await set(ref(database, 'settings/scrimBannerImageDeleteHash'), upload.deleteHash || '');
+
         allData.scrimBannerEnabled = true;
-        allData.scrimBannerImage = imageBase64;
+        allData.scrimBannerImage = upload.url;
+        allData.scrimBannerImageDeleteHash = upload.deleteHash || '';
+
+        if (oldDeleteHash) deleteImgbbImage(oldDeleteHash);
+
         await showSuccessModal('Banner Saved', 'The scrims banner has been added.');
         renderCurrentTab();
     } catch (err) {
@@ -2345,10 +2527,14 @@ async function saveScrimBanner() {
 
 async function deleteScrimBanner() {
     try {
+        const deleteHash = allData.scrimBannerImageDeleteHash;
         await set(ref(database, 'settings/scrimBannerEnabled'), false);
         await set(ref(database, 'settings/scrimBannerImage'), '');
+        await set(ref(database, 'settings/scrimBannerImageDeleteHash'), '');
         allData.scrimBannerEnabled = false;
         allData.scrimBannerImage = '';
+        allData.scrimBannerImageDeleteHash = '';
+        if (deleteHash) await deleteImgbbImage(deleteHash);
         await showSuccessModal('Banner Removed', 'The scrims banner has been removed.');
         renderCurrentTab();
     } catch (err) {
@@ -2365,16 +2551,22 @@ async function saveJoinBanner() {
             await showErrorModal('No File Selected', 'Please choose an image from your device first.');
             return;
         }
-        const imageBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
+        const upload = await uploadFileToImgbb(file);
+        if (!upload || !upload.url) {
+            throw new Error('Upload failed');
+        }
+
+        const oldDeleteHash = allData.joinBannerImageDeleteHash;
         await set(ref(database, 'settings/joinBannerEnabled'), true);
-        await set(ref(database, 'settings/joinBannerImage'), imageBase64);
+        await set(ref(database, 'settings/joinBannerImage'), upload.url);
+        await set(ref(database, 'settings/joinBannerImageDeleteHash'), upload.deleteHash || '');
+
         allData.joinBannerEnabled = true;
-        allData.joinBannerImage = imageBase64;
+        allData.joinBannerImage = upload.url;
+        allData.joinBannerImageDeleteHash = upload.deleteHash || '';
+
+        if (oldDeleteHash) deleteImgbbImage(oldDeleteHash);
+
         await showSuccessModal('Banner Saved', 'The join banner has been added.');
         renderCurrentTab();
     } catch (err) {
@@ -2385,10 +2577,14 @@ async function saveJoinBanner() {
 
 async function deleteJoinBanner() {
     try {
+        const deleteHash = allData.joinBannerImageDeleteHash;
         await set(ref(database, 'settings/joinBannerEnabled'), false);
         await set(ref(database, 'settings/joinBannerImage'), '');
+        await set(ref(database, 'settings/joinBannerImageDeleteHash'), '');
         allData.joinBannerEnabled = false;
         allData.joinBannerImage = '';
+        allData.joinBannerImageDeleteHash = '';
+        if (deleteHash) await deleteImgbbImage(deleteHash);
         await showSuccessModal('Banner Removed', 'The join banner has been removed.');
         renderCurrentTab();
     } catch (err) {
@@ -2458,16 +2654,19 @@ async function saveUpcomingTournamentBanner() {
             return;
         }
 
-        const imageBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
+        const upload = await uploadFileToImgbb(file);
+        if (!upload || !upload.url) {
+            throw new Error('Upload failed');
+        }
 
+        const oldDeleteHash = allData.upcomingTournamentBannerImageDeleteHash;
         await set(ref(database, 'settings/upcomingTournamentBannerEnabled'), true);
-        await set(ref(database, 'settings/upcomingTournamentBannerImage'), imageBase64);
-        allData.upcomingTournamentBannerImage = imageBase64;
+        await set(ref(database, 'settings/upcomingTournamentBannerImage'), upload.url);
+        await set(ref(database, 'settings/upcomingTournamentBannerImageDeleteHash'), upload.deleteHash || '');
+        allData.upcomingTournamentBannerImage = upload.url;
+        allData.upcomingTournamentBannerImageDeleteHash = upload.deleteHash || '';
+
+        if (oldDeleteHash) deleteImgbbImage(oldDeleteHash);
 
         await showSuccessModal('Banner Saved', 'The image has been added to the upcoming tournament section on the website.');
         renderCurrentTab();
@@ -2479,9 +2678,13 @@ async function saveUpcomingTournamentBanner() {
 
 async function deleteUpcomingTournamentBanner() {
     try {
+        const deleteHash = allData.upcomingTournamentBannerImageDeleteHash;
         await set(ref(database, 'settings/upcomingTournamentBannerEnabled'), false);
         await set(ref(database, 'settings/upcomingTournamentBannerImage'), '');
+        await set(ref(database, 'settings/upcomingTournamentBannerImageDeleteHash'), '');
         allData.upcomingTournamentBannerImage = '';
+        allData.upcomingTournamentBannerImageDeleteHash = '';
+        if (deleteHash) await deleteImgbbImage(deleteHash);
         await showSuccessModal('Banner Removed', 'The upcoming tournament banner has been removed.');
         renderCurrentTab();
     } catch (err) {

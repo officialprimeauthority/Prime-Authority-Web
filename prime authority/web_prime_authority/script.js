@@ -22,6 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
 const API_BASE_URL = "https://prime-authority-backend.onrender.com";
+const IMGBB_API_KEY = "cce75417ebaca6654e3b46911c9e512d";
 
 const state = {
   user: null,
@@ -75,6 +76,17 @@ function init() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('auth') === 'login') {
     openAuthModal('login');
+  }
+
+  // Register service worker for faster reloads / caching
+  if ('serviceWorker' in navigator) {
+    try {
+      navigator.serviceWorker.register('./sw.js').then((reg) => {
+        console.log('Service worker registered:', reg.scope);
+      }).catch((err) => console.warn('Service worker registration failed:', err));
+    } catch (e) {
+      console.warn('Service worker not registered:', e);
+    }
   }
 }
 
@@ -353,7 +365,7 @@ async function handleForgotPasswordRequest() {
       const data = await response.json();
       message = data.message || message;
       success = Boolean(data.success);
-    } catch {
+    } catch (err) {
       message = response.statusText || message;
     }
 
@@ -580,7 +592,7 @@ async function handleLogin() {
   const password = document.getElementById("loginPassword").value;
 
   const loginButton = document.querySelector('#loginForm .auth-submit');
-  setButtonLoading(loginButton, true, 'Logging in...');
+  setButtonLoading(loginButton, true, 'SUBMITTING...');
   try {
     await signInWithEmailAndPassword(auth, email, password);
     closeAuthModal();
@@ -593,7 +605,10 @@ async function handleLogin() {
       : error?.message || "Login failed";
     await showErrorModal('Login Failed', errorMessage);
   } finally {
-    setButtonLoading(loginButton, false, 'Login');
+    if (loginButton) {
+      setButtonLoading(loginButton, false, 'LOGIN');
+      loginButton.disabled = false;
+    }
   }
 }
 
@@ -780,6 +795,40 @@ function getFileBase64(id) {
   });
 }
 
+async function uploadInputImageToImgbb(id) {
+  const input = document.getElementById(id);
+  const file = input?.files?.[0];
+  if (!file) return { url: '', deleteHash: '' };
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result?.toString() || '';
+      resolve(result.includes(',') ? result.split(',')[1] : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  try {
+    console.log('Uploading image to imgbb:', file.name, file.type, file.size);
+    const formData = new FormData();
+    formData.append('image', base64);
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    console.log('imgbb response:', data);
+    if (!data || !data.success) {
+      console.error('imgbb upload failed:', data?.error || data);
+      return { url: '', deleteHash: '' };
+    }
+    return { url: data.data.url, deleteHash: data.data.delete_hash };
+  } catch (err) {
+    console.error('imgbb upload error:', err);
+    return { url: '', deleteHash: '' };
+  }
+}
+
 function escapeHTML(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -895,7 +944,7 @@ function renderLineupPage() {
         <section class="team-roster">
           <div class="roster-header">
             <div class="roster-meta">
-              ${logo ? `<img src="${escapeHTML(logo)}" class="roster-logo" alt="${escapeHTML(team)} logo">` : `<div class="roster-logo placeholder">PA</div>`}
+              ${logo ? `<img loading="lazy" src="${escapeHTML(logo)}" class="roster-logo" alt="${escapeHTML(team)} logo">` : `<div class="roster-logo placeholder">PA</div>`}
               <h3 class="roster-title">${escapeHTML(team)}</h3>
             </div>
           </div>
@@ -1009,7 +1058,7 @@ function listenToFormSettings() {
 
 function getBannerHtml(formType, imageUrl) {
   if (imageUrl) {
-    return `<img src="${imageUrl}" style="width: 100%; max-width: 100%; height: auto; object-fit: contain; border-radius: 14px; display: block; margin: 0 auto;" alt="${formType === "tournament" ? "Tournament" : formType === "upcomingTournament" ? "Upcoming Tournament" : formType === "join" ? "Join" : "Scrims"} banner" />`;
+    return `<img loading="lazy" src="${imageUrl}" style="width: 100%; max-width: 100%; height: auto; object-fit: contain; border-radius: 14px; display: block; margin: 0 auto;" alt="${formType === "tournament" ? "Tournament" : formType === "upcomingTournament" ? "Upcoming Tournament" : formType === "join" ? "Join" : "Scrims"} banner" />`;
   }
 
   if (formType === "tournament") {
@@ -1256,8 +1305,116 @@ function attachFormHandlers() {
       });
     }
 
+    // Prevent numeric characters in certain text fields
+    const teamRegionEl = document.getElementById('teamRegion');
+    const managerFullNameEl = document.getElementById('managerFullName');
+    const whatsappEl = document.getElementById('whatsappContact');
+    const teamLogoInput = document.getElementById('teamLogo');
+
+    function showFieldError(el, message) {
+      if (!el) return;
+      clearFieldError(el);
+      const err = document.createElement('div');
+      err.className = 'field-error';
+      err.style.color = '#ffb3b3';
+      err.style.fontSize = '13px';
+      err.style.marginTop = '6px';
+      err.textContent = message;
+      el.insertAdjacentElement('afterend', err);
+      try { el.focus(); } catch (e) {}
+    }
+
+    function clearFieldError(el) {
+      if (!el) return;
+      const next = el.nextElementSibling;
+      if (next && next.classList.contains('field-error')) next.remove();
+    }
+
+    if (teamLogoInput) {
+      teamLogoInput.addEventListener('change', () => clearFieldError(teamLogoInput));
+    }
+
+    if (teamRegionEl) {
+      teamRegionEl.addEventListener('input', () => {
+        teamRegionEl.value = teamRegionEl.value.replace(/[0-9]/g, '');
+      });
+    }
+
+    if (managerFullNameEl) {
+      managerFullNameEl.addEventListener('input', () => {
+        managerFullNameEl.value = managerFullNameEl.value.replace(/[0-9]/g, '');
+      });
+    }
+
+    if (whatsappEl) {
+      const PREFIX = '+91';
+      // Ensure prefix present
+      if (!whatsappEl.value || !whatsappEl.value.startsWith(PREFIX)) whatsappEl.value = PREFIX;
+
+      // Handle composition (IME) and prevent prefix deletion while allowing digit edits
+      let isComposing = false;
+      whatsappEl.addEventListener('compositionstart', () => { isComposing = true; });
+      whatsappEl.addEventListener('compositionend', () => { isComposing = false; });
+
+      // Prevent deletion of prefix when caret is inside it (allow other edits)
+      whatsappEl.addEventListener('keydown', (e) => {
+        const selStart = whatsappEl.selectionStart ?? 0;
+        const selEnd = whatsappEl.selectionEnd ?? 0;
+        const destructive = e.key === 'Backspace' || e.key === 'Delete';
+        if (destructive && selStart < PREFIX.length && selStart === selEnd) {
+          e.preventDefault();
+          whatsappEl.setSelectionRange(PREFIX.length, PREFIX.length);
+        }
+        // Do not block other keys here to avoid IME/virtual keyboard issues
+      });
+
+      // If a selection would remove prefix, collapse selection to after prefix
+      whatsappEl.addEventListener('beforeinput', (e) => {
+        try {
+          const selStart = whatsappEl.selectionStart ?? 0;
+          const selEnd = whatsappEl.selectionEnd ?? 0;
+          if (selStart < PREFIX.length && selEnd > PREFIX.length) {
+            e.preventDefault();
+            whatsappEl.setSelectionRange(PREFIX.length, selEnd);
+          }
+        } catch (err) {
+          // ignore
+        }
+      });
+
+      // sanitize input/paste: keep only first 10 digits after prefix and avoid disrupting IME
+      whatsappEl.addEventListener('input', () => {
+        if (isComposing) return;
+        const raw = whatsappEl.value || '';
+        const hasPrefix = raw.startsWith(PREFIX);
+        const rest = hasPrefix ? raw.slice(PREFIX.length) : raw;
+        const digits = rest.replace(/\D/g, '').slice(0, 10); // keep first up to 10 digits
+        const newValue = PREFIX + digits;
+        if (newValue !== raw) {
+          const prevLen = raw.length;
+          const caret = whatsappEl.selectionStart ?? newValue.length;
+          whatsappEl.value = newValue;
+          const newPos = Math.max(PREFIX.length, Math.min(newValue.length, caret - (prevLen - newValue.length)));
+          whatsappEl.setSelectionRange(newPos, newPos);
+        }
+      });
+
+      // Ensure on blur we normalize to +91XXXXXXXXXX if possible; otherwise keep prefix + up to 10 digits
+      whatsappEl.addEventListener('blur', () => {
+        const normalized = normalizeIndiaMobile(whatsappEl.value);
+        if (normalized) {
+          whatsappEl.value = normalized;
+        } else {
+          const digits = (whatsappEl.value || '').replace(/\D/g, '').slice(0, 10);
+          whatsappEl.value = PREFIX + digits;
+        }
+      });
+    }
+
     joinForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const submitBtn = joinForm.querySelector('button[type="submit"]');
+
       if (!auth.currentUser) {
         openAuthModal("login");
         return;
@@ -1275,6 +1432,13 @@ function attachFormHandlers() {
         return;
       }
 
+      // Ensure team logo is present
+      const logoInput = document.getElementById('teamLogo');
+      if (!logoInput || !logoInput.files || logoInput.files.length === 0) {
+        showFieldError(logoInput, 'Team logo is required. Please upload your team logo before applying.');
+        return;
+      }
+
       const whatsappRaw = getFieldValue("whatsappContact");
       const whatsappContact = normalizeIndiaMobile(whatsappRaw);
       if (!whatsappContact) {
@@ -1282,8 +1446,17 @@ function attachFormHandlers() {
         return;
       }
 
+      setButtonLoading(submitBtn, true, 'SUBMITTING...');
+      try {
+        // Upload logo to imgbb and include delete hash in payload
+        const teamLogoUpload = await uploadInputImageToImgbb("teamLogo");
+        const teamLogo = teamLogoUpload.url || "";
+        const teamLogoDeleteHash = teamLogoUpload.deleteHash || "";
+
       const payload = {
         teamName: getFieldValue("teamName"),
+        teamLogo,
+        teamLogoDeleteHash,
         teamRegion: getFieldValue("teamRegion"),
         managerIgn: getFieldValue("managerIgn"),
         managerFullName: getFieldValue("managerFullName"),
@@ -1325,6 +1498,12 @@ function attachFormHandlers() {
         updateFormAvailability();
         if (globalLoader) globalLoader.hideLoading(200);
       }, 100);
+      } catch (err) {
+        console.error('Join submission failed', err);
+        await showErrorModal('Submission Failed', err.message || 'Could not submit your application.');
+      } finally {
+        setButtonLoading(submitBtn, false, 'APPLY NOW');
+      }
     });
   }
 
@@ -1332,6 +1511,8 @@ function attachFormHandlers() {
   if (tournamentForm) {
     tournamentForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const submitBtn = tournamentForm.querySelector('button[type="submit"]');
+
       if (!auth.currentUser) {
         openAuthModal("login");
         return;
@@ -1342,14 +1523,19 @@ function attachFormHandlers() {
         return;
       }
 
-      const tournamentAgreement = getCheckboxValue("tournamentAgreement");
-      const tournamentTerms = getCheckboxValue("tournamentTerms");
-      if (!tournamentAgreement || !tournamentTerms) {
-        await showErrorModal('Validation Error', 'Please confirm all tournament agreement checkboxes before submitting.');
-        return;
-      }
+      try {
+        const tournamentAgreement = getCheckboxValue("tournamentAgreement");
+        const tournamentTerms = getCheckboxValue("tournamentTerms");
+        if (!tournamentAgreement || !tournamentTerms) {
+          await showErrorModal('Validation Error', 'Please confirm all tournament agreement checkboxes before submitting.');
+          return;
+        }
 
-      const teamLogo = await getFileBase64("teamLogo");
+        setButtonLoading(submitBtn, true, 'SUBMITTING...');
+
+      const teamLogoUpload = await uploadInputImageToImgbb("teamLogo");
+      const teamLogo = teamLogoUpload.url || "";
+      const teamLogoDeleteHash = teamLogoUpload.deleteHash || "";
       const teamContactRaw = getFieldValue("teamContact");
       const teamContact = normalizeIndiaMobile(teamContactRaw);
       if (!teamContact) {
@@ -1359,6 +1545,7 @@ function attachFormHandlers() {
       const payload = {
         teamName: getFieldValue("teamName"),
         teamLogo,
+        teamLogoDeleteHash,
         teamIGLUID: getFieldValue("teamIGLUID"),
         teamIGLIGN: getFieldValue("teamIGLIGN"),
         teamContact,
@@ -1398,6 +1585,12 @@ function attachFormHandlers() {
         updateFormAvailability();
         if (globalLoader) globalLoader.hideLoading(200);
       }, 100);
+      } catch (err) {
+        console.error('Tournament submission failed', err);
+        await showErrorModal('Submission Failed', err.message || 'Could not submit your registration.');
+      } finally {
+        setButtonLoading(submitBtn, false, 'Register');
+      }
     });
   }
 
@@ -1405,6 +1598,8 @@ function attachFormHandlers() {
   if (scrimsForm) {
     scrimsForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const submitBtn = scrimsForm.querySelector('button[type="submit"]');
+
       if (!auth.currentUser) {
         openAuthModal("login");
         return;
@@ -1415,14 +1610,19 @@ function attachFormHandlers() {
         return;
       }
 
-      const scrimsAgreement = getCheckboxValue("scrimsAgreement");
-      const scrimsTerms = getCheckboxValue("scrimsTerms");
-      if (!scrimsAgreement || !scrimsTerms) {
-        await showErrorModal('Validation Error', 'Please confirm all scrims agreement checkboxes before submitting.');
-        return;
-      }
+      try {
+        const scrimsAgreement = getCheckboxValue("scrimsAgreement");
+        const scrimsTerms = getCheckboxValue("scrimsTerms");
+        if (!scrimsAgreement || !scrimsTerms) {
+          await showErrorModal('Validation Error', 'Please confirm all scrims agreement checkboxes before submitting.');
+          return;
+        }
 
-      const teamLogo = await getFileBase64("teamLogo");
+        setButtonLoading(submitBtn, true, 'SUBMITTING...');
+
+      const teamLogoUpload = await uploadInputImageToImgbb("teamLogo");
+      const teamLogo = teamLogoUpload.url || "";
+      const teamLogoDeleteHash = teamLogoUpload.deleteHash || "";
       const scrimsWhatsappRaw = getFieldValue("whatsapp");
       const scrimsWhatsapp = normalizeIndiaMobile(scrimsWhatsappRaw);
       if (!scrimsWhatsapp) {
@@ -1432,6 +1632,7 @@ function attachFormHandlers() {
       const payload = {
         teamName: getFieldValue("teamName"),
         teamLogo,
+        teamLogoDeleteHash,
         captainUID: getFieldValue("captainUID"),
         captainIGN: getFieldValue("captainIGN"),
         whatsapp: scrimsWhatsapp,
@@ -1466,6 +1667,12 @@ function attachFormHandlers() {
         updateFormAvailability();
         if (globalLoader) globalLoader.hideLoading(200);
       }, 100);
+      } catch (err) {
+        console.error('Scrims submission failed', err);
+        await showErrorModal('Submission Failed', err.message || 'Could not submit your scrims booking.');
+      } finally {
+        setButtonLoading(submitBtn, false, 'Book');
+      }
     });
   }
 

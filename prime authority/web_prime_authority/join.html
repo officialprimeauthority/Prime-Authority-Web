@@ -57,7 +57,8 @@ required>
 <input
 type="file"
 id="teamLogo"
-accept="image/*">
+accept="image/*"
+required>
 
 <input
 type="text"
@@ -68,7 +69,7 @@ required>
 <input
 type="text"
 id="managerIgn"
-placeholder="Team Manager / IGL Name (IGN)"
+placeholder="Team Manager / In Game Name (IGN)"
 required>
 
 <input
@@ -80,7 +81,9 @@ placeholder="Team Manager / IGL Full Name (Optional)">
 type="number"
 id="totalPlayers"
 placeholder="Total Players In Team"
-required>
+required
+min="1"
+inputmode="numeric">
 
 <input
 type="text"
@@ -98,11 +101,11 @@ placeholder="Previous Organization (Optional)">
 </select>
 
 <input
-type="text"
-id="bestTournamentResult"
-placeholder="Player UID"
-required>
-
+ type="number"
+ id="bestTournamentResult"
+ placeholder="Player UID"
+ required
+ inputmode="numeric">
 <select id="preferredPlayTime" required>
 
 <option value="">Preferred Play Time</option>
@@ -118,16 +121,19 @@ required>
 </select>
 
 <input
-type="tel"
-id="whatsappContact"
-placeholder="WhatsApp Contact Number"
-required>
+ type="tel"
+ id="whatsappContact"
+ placeholder="WhatsApp Contact Number"
+ required
+ pattern="^\+?\d{10,12}$"
+ inputmode="numeric"
+ value="+91">
 
 <input
-type="email"
-id="emailAddress"
-placeholder="Email Address"
-required>
+ type="email"
+ id="emailAddress"
+ placeholder="Email Address"
+ required>
 
 <div class="consent-group">
 <label class="consent-item">
@@ -148,8 +154,8 @@ APPLY NOW
 
 </section>
 
-<script src="loading.js"></script>
-<script src="modal.js"></script>
+<script src="loading.js" defer></script>
+<script src="modal.js" defer></script>
 <script type="module" src="script.js"></script>
 
 </body>
