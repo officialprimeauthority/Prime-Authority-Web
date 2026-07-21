@@ -603,6 +603,10 @@ async function handleLogin() {
       : error?.code === "auth/user-not-found" || rawMessage.includes("user-not-found")
       ? "User not found"
       : error?.message || "Login failed";
+    if (loginButton) {
+      setButtonLoading(loginButton, false, 'LOGIN');
+      loginButton.disabled = false;
+    }
     await showErrorModal('Login Failed', errorMessage);
   } finally {
     if (loginButton) {

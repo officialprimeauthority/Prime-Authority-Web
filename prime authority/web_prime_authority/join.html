@@ -77,13 +77,11 @@ type="text"
 id="managerFullName"
 placeholder="Team Manager / IGL Full Name (Optional)">
 
-<input
-type="number"
-id="totalPlayers"
-placeholder="Total Players In Team"
-required
-min="1"
-inputmode="numeric">
+<select id="totalPlayers" required>
+  <option value="">Total Players In Team</option>
+  <option value="4">4</option>
+  <option value="5">5</option>
+</select>
 
 <input
 type="text"

@@ -1,15 +1,15 @@
-const CACHE_NAME = 'prime-authority-v1';
+const CACHE_NAME = 'prime-authority-v2';
 const ASSETS_TO_CACHE = [
-  '/',
-  'index.html',
-  'join.html',
-  'tournament.html',
-  'scrims.html',
-  'style.css',
-  'script.js',
-  'modal.js',
-  'loading.js',
-  'modal.css'
+  './',
+  './index.html',
+  './join.html',
+  './tournament.html',
+  './scrims.html',
+  './style.css',
+  './script.js',
+  './modal.js',
+  './loading.js',
+  './modal.css'
 ];
 
 self.addEventListener('install', (event) => {
@@ -35,23 +35,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  // Only handle GET requests
   if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isHtmlPage = isSameOrigin && (url.pathname.endsWith('/join.html') || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/tournament.html') || url.pathname.endsWith('/scrims.html'));
+
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          // cache same-origin responses
-          try {
-            const resClone = res.clone();
-            if (req.url.startsWith(self.location.origin)) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
-            }
-          } catch (e) {}
-          return res;
-        })
-        .catch(() => caches.match('index.html'));
-    })
+    fetch(req)
+      .then((res) => {
+        if (isSameOrigin && res && res.status === 200) {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
   );
 });
