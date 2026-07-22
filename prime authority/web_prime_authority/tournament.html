@@ -44,6 +44,16 @@
     <input type="text" id="teamName" placeholder="Enter team name" required>
     <label style="color:#fff; font-size:14px; font-weight:600;">TEAM LOGO <span style="color:#aaa; font-size:12px;">(OPTIONAL)</span></label>
     <input type="file" id="teamLogo" accept="image/*">
+    <div id="tournamentLogoPreviewContainer" style="display:none; margin-top:16px; padding:16px; background:linear-gradient(135deg, #1a1a1a 0%, #222226 100%); border-radius:12px; border:2px solid #ff2b2b; box-shadow:0 4px 12px rgba(255, 43, 43, 0.15);">
+      <p style="color:#ff2b2b; font-size:12px; font-weight:600; margin:0 0 10px 0; text-transform:uppercase; letter-spacing:0.5px;">✓ Logo Preview</p>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img id="tournamentLogoPreview" src="" alt="Logo preview" style="width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid #ff2b2b; background:#0f0f17;">
+        <div>
+          <p id="tournamentLogoFileName" style="color:#fff; font-size:13px; font-weight:600; margin:0 0 4px 0; word-break:break-word;">Logo selected</p>
+          <p style="color:#888; font-size:11px; margin:0;">Ready to upload</p>
+        </div>
+      </div>
+    </div>
     <label style="color:#fff; font-size:14px; font-weight:600;">TEAM IGL UID <span style="color:#aaa; font-size:12px;">(REQUIRED)</span></label>
     <input type="text" id="teamIGLUID" placeholder="Enter IGL UID" required>
     <label style="color:#fff; font-size:14px; font-weight:600;">TEAM IGL IN-GAME NAME (IGN) <span style="color:#aaa; font-size:12px;">(REQUIRED)</span></label>

@@ -53,12 +53,22 @@ id="teamName"
 placeholder="Team Name"
 required>
 
-<label style="color:#fff; font-size:14px; margin-top:10px; display:block;">Team Logo (Upload)</label>
+<label style="color:#fff; font-size:14px; margin-top:10px; display:block;">Team Logo (Required)</label>
 <input
 type="file"
 id="teamLogo"
 accept="image/*"
 required>
+<div id="logoPreviewContainer" style="display:none; margin-top:16px; padding:16px; background:linear-gradient(135deg, #1a1a1a 0%, #222226 100%); border-radius:12px; border:2px solid #ff2b2b; box-shadow:0 4px 12px rgba(255, 43, 43, 0.15);">
+  <p style="color:#ff2b2b; font-size:12px; font-weight:600; margin:0 0 10px 0; text-transform:uppercase; letter-spacing:0.5px;">✓ Logo Preview</p>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <img id="logoPreview" src="" alt="Logo preview" style="width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid #ff2b2b; background:#0f0f17;">
+    <div>
+      <p id="logoFileName" style="color:#fff; font-size:13px; font-weight:600; margin:0 0 4px 0; word-break:break-word;">Logo selected</p>
+      <p style="color:#888; font-size:11px; margin:0;">Ready to upload</p>
+    </div>
+  </div>
+</div>
 
 <input
 type="text"
@@ -154,6 +164,7 @@ APPLY NOW
 
 <script src="loading.js" defer></script>
 <script src="modal.js" defer></script>
+<script type="module" src="join.js"></script>
 <script type="module" src="script.js"></script>
 
 </body>

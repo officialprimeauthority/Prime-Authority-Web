@@ -31,42 +31,92 @@ async function uploadFileToImgbb(file) {
 const form = document.getElementById("joinForm");
 const teamLogoInput = document.getElementById("teamLogo");
 
+// Logo preview functionality
+if (teamLogoInput) {
+    teamLogoInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        const previewContainer = document.getElementById('logoPreviewContainer');
+        const preview = document.getElementById('logoPreview');
+        const fileName = document.getElementById('logoFileName');
+
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                preview.src = event.target.result;
+                const fileSizeKB = (file.size / 1024).toFixed(2);
+                fileName.textContent = `${file.name} (${fileSizeKB} KB)`;
+                previewContainer.style.display = 'block';
+                // Scroll to preview if needed
+                previewContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewContainer.style.display = 'none';
+        }
+    });
+}
+
 form.addEventListener("submit", async function(e){
     e.preventDefault();
+
+    // Ensure logo is uploaded
+    if (!teamLogoInput.files || teamLogoInput.files.length === 0) {
+        showErrorModal("Error", "❌ Team logo is required. Please upload your team logo.");
+        return;
+    }
 
     let teamLogo = "";
     let teamLogoDeleteHash = "";
 
-    if (teamLogoInput.files && teamLogoInput.files[0]) {
-        const file = teamLogoInput.files[0];
-        const upload = await uploadFileToImgbb(file);
-        teamLogo = upload?.url || '';
-        teamLogoDeleteHash = upload?.deleteHash || '';
+    try {
+        // Upload logo to imgbb
+        if (teamLogoInput.files && teamLogoInput.files[0]) {
+            const file = teamLogoInput.files[0];
+            console.log("Uploading logo:", file.name, "size:", file.size);
+            const upload = await uploadFileToImgbb(file);
+            
+            if (!upload || !upload.url) {
+                showErrorModal("Upload Failed", "❌ Logo upload failed. Please try again.");
+                console.error("Logo upload returned null/empty:", upload);
+                return;
+            }
+            
+            teamLogo = upload.url;
+            teamLogoDeleteHash = upload.deleteHash ?? '';
+            console.log("Logo uploaded successfully:", teamLogo, "deleteHash:", teamLogoDeleteHash);
+        }
+
+        const player = {
+            teamName: document.getElementById("teamName").value.trim(),
+            teamLogo,
+            teamLogoDeleteHash: teamLogoDeleteHash || '',
+            teamRegion: document.getElementById("teamRegion").value.trim(),
+            managerIgn: document.getElementById("managerIgn").value.trim(),
+            managerFullName: document.getElementById("managerFullName").value.trim(),
+            totalPlayers: document.getElementById("totalPlayers").value,
+            previousOrganization: document.getElementById("previousOrganization").value.trim(),
+            tournamentExperience: document.getElementById("tournamentExperience").value,
+            bestTournamentResult: document.getElementById("bestTournamentResult").value.trim(),
+            preferredPlayTime: document.getElementById("preferredPlayTime").value,
+            whatsappContact: document.getElementById("whatsappContact").value.trim(),
+            emailAddress: document.getElementById("emailAddress").value.trim(),
+            createdAt: new Date().toISOString()
+        };
+
+        console.log("Submitting application with logo URL:", player.teamLogo);
+        
+        push(ref(database, "applications"), player)
+        .then(() => {
+            showSuccessModal("Success", "✅ Application Submitted Successfully! Your logo will appear in the admin panel.");
+            form.reset();
+            document.getElementById('logoPreviewContainer').style.display = 'none';
+        })
+        .catch((error) => {
+            showErrorModal("Error", "❌ Database Error: " + error.message);
+            console.error("Firebase push error:", error);
+        });
+    } catch (error) {
+        showErrorModal("Error", "❌ Submission Error: " + error.message);
+        console.error("Form submission error:", error);
     }
-
-    const player = {
-        teamName: document.getElementById("teamName").value.trim(),
-        teamLogo,
-        teamLogoDeleteHash,
-        teamRegion: document.getElementById("teamRegion").value.trim(),
-        managerIgn: document.getElementById("managerIgn").value.trim(),
-        managerFullName: document.getElementById("managerFullName").value.trim(),
-        totalPlayers: document.getElementById("totalPlayers").value,
-        previousOrganization: document.getElementById("previousOrganization").value.trim(),
-        tournamentExperience: document.getElementById("tournamentExperience").value,
-        bestTournamentResult: document.getElementById("bestTournamentResult").value.trim(),
-        preferredPlayTime: document.getElementById("preferredPlayTime").value,
-        whatsappContact: document.getElementById("whatsappContact").value.trim(),
-        emailAddress: document.getElementById("emailAddress").value.trim(),
-        createdAt: new Date().toISOString()
-    };
-
-    push(ref(database, "applications"), player)
-    .then(() => {
-        showSuccessModal("Success", "✅ Application Submitted Successfully!");
-        form.reset();
-    })
-    .catch((error) => {
-        showErrorModal("Error", "❌ Error: " + error.message);
-    });
 });

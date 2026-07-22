@@ -621,19 +621,21 @@ async function handleSignup() {
   const email = document.getElementById("signupEmail").value.trim();
   const password = document.getElementById("signupPassword").value;
   const confirmPassword = document.getElementById("signupConfirmPassword").value;
+  const signupButton = document.querySelector('#signupForm .auth-submit');
 
   if (password !== confirmPassword) {
     await showErrorModal('Error', 'Passwords do not match.');
+    if (signupButton) setButtonLoading(signupButton, false, 'Sign Up');
     return;
   }
 
   if (!isPasswordValid(password)) {
     await showErrorModal('Error', 'Password must be at least 7 characters long and include at least one digit.');
+    if (signupButton) setButtonLoading(signupButton, false, 'Sign Up');
     return;
   }
 
-  const signupButton = document.querySelector('#signupForm .auth-submit');
-  setButtonLoading(signupButton, true, 'Signing up...');
+  setButtonLoading(signupButton, true, 'SIGNING UP...');
 
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
@@ -1415,104 +1417,35 @@ function attachFormHandlers() {
       });
     }
 
-    joinForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const submitBtn = joinForm.querySelector('button[type="submit"]');
-
-      if (!auth.currentUser) {
-        openAuthModal("login");
-        return;
-      }
-
-      if (!state.formSettings.join) {
-        await showErrorModal('Not Available', 'Join applications are currently closed by the admin.');
-        return;
-      }
-
-      const detailsConfirm = getCheckboxValue("detailsConfirm");
-      const rulesAgree = getCheckboxValue("rulesAgree");
-      if (!detailsConfirm || !rulesAgree) {
-        await showErrorModal('Validation Error', 'Please confirm your details and agree to the rules before submitting.');
-        return;
-      }
-
-      // Ensure team logo is present
-      const logoInput = document.getElementById('teamLogo');
-      if (!logoInput || !logoInput.files || logoInput.files.length === 0) {
-        showFieldError(logoInput, 'Team logo is required. Please upload your team logo before applying.');
-        return;
-      }
-
-      const whatsappRaw = getFieldValue("whatsappContact");
-      const whatsappContact = normalizeIndiaMobile(whatsappRaw);
-      if (!whatsappContact) {
-        await showErrorModal('Validation Error', 'WhatsApp contact must be a valid +91 10-digit number.');
-        return;
-      }
-
-      setButtonLoading(submitBtn, true, 'SUBMITTING...');
-      try {
-        // Upload logo to imgbb and include delete hash in payload
-        const teamLogoUpload = await uploadInputImageToImgbb("teamLogo");
-        const teamLogo = teamLogoUpload.url || "";
-        const teamLogoDeleteHash = teamLogoUpload.deleteHash || "";
-
-      const payload = {
-        teamName: getFieldValue("teamName"),
-        teamLogo,
-        teamLogoDeleteHash,
-        teamRegion: getFieldValue("teamRegion"),
-        managerIgn: getFieldValue("managerIgn"),
-        managerFullName: getFieldValue("managerFullName"),
-        totalPlayers: getFieldValue("totalPlayers"),
-        previousOrganization: getFieldValue("previousOrganization"),
-        tournamentExperience: getFieldValue("tournamentExperience"),
-        bestTournamentResult: getFieldValue("bestTournamentResult"),
-        preferredPlayTime: getFieldValue("preferredPlayTime"),
-        whatsappContact,
-        emailAddress: getFieldValue("emailAddress"),
-        userId: auth.currentUser.uid,
-        userEmail: auth.currentUser.email || "",
-        status: "Pending",
-        createdAt: new Date().toISOString(),
-      };
-
-      await push(ref(database, "applications"), payload);
-      // mark user as having submitted join form
-      try {
-        await set(ref(database, `users/${auth.currentUser.uid}/forms/join`), true);
-        // update local state immediately so UI updates without waiting for DB listener
-        if (!state.user) state.user = { uid: auth.currentUser.uid, forms: {} };
-        state.user.forms = state.user.forms || {};
-        state.user.forms.join = true;
-        updateFormAvailability();
-      } catch (err) {
-        console.warn('Failed to set user join flag', err);
-      }
-      await push(ref(database, `notifications/${auth.currentUser.uid}`), {
-        type: "join",
-        message: "Your recruitment request has been submitted and is pending admin review.",
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      });
-      await showSuccessModal('Success', 'Your request has been submitted. You will receive updates in notifications.');
-      joinForm.reset();
-      // Update form visibility and hide loading
-      setTimeout(() => {
-        updateFormAvailability();
-        if (globalLoader) globalLoader.hideLoading(200);
-      }, 100);
-      } catch (err) {
-        console.error('Join submission failed', err);
-        await showErrorModal('Submission Failed', err.message || 'Could not submit your application.');
-      } finally {
-        setButtonLoading(submitBtn, false, 'APPLY NOW');
-      }
-    });
   }
 
   const tournamentForm = document.getElementById("tournamentForm");
   if (tournamentForm) {
+    // Logo preview for tournament form
+    const tournamentLogoInput = document.getElementById("teamLogo");
+    if (tournamentLogoInput) {
+      tournamentLogoInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        const previewContainer = document.getElementById('tournamentLogoPreviewContainer');
+        const preview = document.getElementById('tournamentLogoPreview');
+        const fileName = document.getElementById('tournamentLogoFileName');
+
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            preview.src = event.target.result;
+            const fileSizeKB = (file.size / 1024).toFixed(2);
+            fileName.textContent = `${file.name} (${fileSizeKB} KB)`;
+            previewContainer.style.display = 'block';
+            previewContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          };
+          reader.readAsDataURL(file);
+        } else {
+          previewContainer.style.display = 'none';
+        }
+      });
+    }
+
     tournamentForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const submitBtn = tournamentForm.querySelector('button[type="submit"]');
@@ -1600,6 +1533,31 @@ function attachFormHandlers() {
 
   const scrimsForm = document.getElementById("scrimsForm");
   if (scrimsForm) {
+    // Logo preview for scrims form
+    const scrimsLogoInput = scrimsForm.querySelector('#teamLogo');
+    if (scrimsLogoInput) {
+      scrimsLogoInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        const previewContainer = document.getElementById('scrimsLogoPreviewContainer');
+        const preview = document.getElementById('scrimsLogoPreview');
+        const fileName = document.getElementById('scrimsLogoFileName');
+
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            preview.src = event.target.result;
+            const fileSizeKB = (file.size / 1024).toFixed(2);
+            fileName.textContent = `${file.name} (${fileSizeKB} KB)`;
+            previewContainer.style.display = 'block';
+            previewContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          };
+          reader.readAsDataURL(file);
+        } else {
+          previewContainer.style.display = 'none';
+        }
+      });
+    }
+
     scrimsForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const submitBtn = scrimsForm.querySelector('button[type="submit"]');
